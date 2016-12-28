@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import me.krstic.service.TimestampService;
+import me.krstic.vo.ServiceResponse;
 
 @RestController
 public class TimestampController {
@@ -23,8 +24,10 @@ public class TimestampController {
 	}
 
 	@RequestMapping(value = "/timestamp", params = {"id"}, method = RequestMethod.GET)
-	public void getTimestamp(@RequestParam(name="id") Long id) {
-		timestampService.getTimeStampToken(id);
+	public ResponseEntity<ServiceResponse> getTimestamp(@RequestParam(name="id") Long id) {
+		ServiceResponse serviceResponse = timestampService.getTimeStampToken(id);
+		
+		return new ResponseEntity<>(serviceResponse, HttpStatus.valueOf(serviceResponse.getCode()));
 	}
 
 }

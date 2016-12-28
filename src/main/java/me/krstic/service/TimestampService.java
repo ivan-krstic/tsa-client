@@ -54,17 +54,23 @@ public class TimestampService {
 		this.digitalRepository = digitalRepository;
 	}
 
-	public void getTimeStampToken(Long id) {
+	public ServiceResponse getTimeStampToken(Long id) {
 		System.setProperty("http.proxyHost", httpProxyHost);
         System.setProperty("http.proxyPort", httpProxyPort);
 		
 		Digital digital = digitalRepository.findOne(id);
+		
+		if (digital == null) {
+			LOG.error("Document with ID: " + id + " doesn't exists.");
+			return new ServiceResponse(404, "Document with ID: " + id + " doesn't exists.");
+		}
 
 		MessageDigest digest = null;
 		try {
 			digest = MessageDigest.getInstance("SHA-1");
 		} catch (NoSuchAlgorithmException e1) {
 			LOG.error("NoSuchAlgorithmException: " + e1);
+			return new ServiceResponse(400, "NoSuchAlgorithmException.");
 		}
 		
 		digest.reset();
@@ -83,8 +89,8 @@ public class TimestampService {
 		try {
 			Files.write(Paths.get("C:\\my-works\\Digital\\TimestampServer\\Test\\4\\testJavaRequest.tsq"), request.getEncoded());
 		} catch (IOException e2) {
-			// TODO Auto-generated catch block
-			e2.printStackTrace();
+			LOG.error("IOException: " + e2);
+			return new ServiceResponse(400, "IOException.");
 		}
 		
 		// get TSA response
@@ -93,6 +99,7 @@ public class TimestampService {
 			tsaResponse = getTSAResponse(request.getEncoded());
 		} catch (IOException e1) {
 			LOG.error("Response does not have a response.: " + e1);
+			return new ServiceResponse(503, "Posta TSA Unavailable.");
 		}
 		
 		TimeStampResponse response = null;
@@ -101,11 +108,13 @@ public class TimestampService {
 			response.validate(request);
 		} catch (TSPException | IOException e) {
 			LOG.error("TSPException: " + e);
+			return new ServiceResponse(400, "TSP Exception.");
 		}
 
 		TimeStampToken token = response.getTimeStampToken();
 		if (token == null) {
 			LOG.error("Response does not have a timestamp token.");
+			return new ServiceResponse(400, "Response does not have a timestamp token.");
 		}
 		
 		TimeStampTokenInfo info = token.getTimeStampInfo();
@@ -115,80 +124,32 @@ public class TimestampService {
      	LOG.info("TSA: " + info.getTsa());
      	LOG.info("TimeStampInfo: " + token.getTimeStampInfo().getTsa());
      	
+/*   	CREATE File from Response byte[]  	
      	Path path = Paths.get("C:\\my-works\\Digital\\TimestampServer\\Test\\4\\testJavaResponse.tsr");
+     	
 		try {
 			Files.write(path, tsaResponse);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
+*/		
+		digital.setTsaResponse(Base64Converter.encodeBase64(tsaResponse));
 
+/*		
+		Path path = Paths.get("C:\\my-works\\Digital\\TimestampServer\\Test\\4\\testJavaResponse.tsr");
+		try {
+			Files.write(path, Base64Converter.decodeBase64(digital.getTsaResponse().getBytes()));
+		} catch (IOException e) {
+			LOG.error("Error creating TSAResponse.tsr");
+			return new ServiceResponse(400, "Error creating TSAResponse.tsr");
+		}
+*/		
+		digitalRepository.save(digital);
+		
+		return new ServiceResponse(200, "OK");
+	}
 	
-//	public byte[] getTimeStampToken(byte[] messageImprint) throws IOException {
-/*
-	public void getTimeStampToken(byte[] messageImprint) {
-		System.setProperty("http.proxyHost", httpProxyHost);
-        System.setProperty("http.proxyPort", httpProxyPort);
-
-		MessageDigest digest = null;
-		try {
-			digest = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e1) {
-			LOG.error("NoSuchAlgorithmException: " + e1);
-		}
-		
-		digest.reset();
-		byte[] hash = digest.digest(messageImprint);
-		
-		// 32-bit cryptographic nonce
-		SecureRandom random = new SecureRandom();
-		int nonce = random.nextInt();
-		
-		// generate TSA request
-		TimeStampRequestGenerator tsaRequestGenerator = new TimeStampRequestGenerator();
-		tsaRequestGenerator.setCertReq(true);
-		ASN1ObjectIdentifier oid = getHashObjectIdentifier(digest.getAlgorithm());
-		TimeStampRequest request = tsaRequestGenerator.generate(oid, hash, BigInteger.valueOf(nonce));
-		
-		// get TSA response
-		byte[] tsaResponse = null;
-		try {
-			tsaResponse = getTSAResponse(request.getEncoded());
-		} catch (IOException e1) {
-			LOG.error("Response does not have a response.: " + e1);
-		}
-		TimeStampResponse response = null;
-		try {
-			response = new TimeStampResponse(tsaResponse);
-			response.validate(request);
-		} catch (TSPException | IOException e) {
-			LOG.error("TSPException: " + e);
-		}
-
-		TimeStampToken token = response.getTimeStampToken();
-		if (token == null) {
-			LOG.error("Response does not have a timestamp token.");
-		}
-		
-		TimeStampTokenInfo info = token.getTimeStampInfo();
-		
-		LOG.info("Digest Algorithm OID: " + info.getMessageImprintAlgOID());
-     	LOG.info("Time: " + info.getGenTime());
-     	LOG.info("TSA: " + info.getTsa());
-     	LOG.info("TimeStampInfo: " + token.getTimeStampInfo().getTsa());
-     	
-     	Path path = Paths.get("C:\\my-works\\Digital\\TimestampServer\\Test\\4\\testJavaResponse.tsr");
-		try {
-			Files.write(path, tsaResponse);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-//		return token.getEncoded();
-	}
-*/
 	// gets response data for the given encoded TimeStampRequest data
 	// throws IOException if a connection to the TSA cannot be established
 	private byte[] getTSAResponse(byte[] request) throws IOException {

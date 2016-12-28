@@ -22,11 +22,8 @@ public class Digital {
 	private String status;
 	private String tsaResponse;
 	private String guid;
-//	@Temporal(TemporalType.TIMESTAMP)
 	private Timestamp startDate;
-//	@Temporal(TemporalType.TIMESTAMP)
 	private Timestamp modifyDate;
-//	@Temporal(TemporalType.TIMESTAMP)
 	private Timestamp endDate;
 	
 	public Digital() {
